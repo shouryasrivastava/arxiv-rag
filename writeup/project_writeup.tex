@@ -1,12 +1,68 @@
 \documentclass[paper=a4, fontsize=11pt]{scrartcl}
 
-\input{include/hw-template.tex}
+% ── Encoding & fonts ──────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ── Page geometry ─────────────────────────────────────────────────────────────
+\usepackage[top=1in, bottom=1in, left=1in, right=1in]{geometry}
+
+% ── Math ──────────────────────────────────────────────────────────────────────
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% ── Graphics / TikZ ───────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, decorations.pathreplacing, calc}
+
+% ── Tables ────────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{multirow}
+
+% ── Lists ─────────────────────────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist[itemize]{leftmargin=*, topsep=3pt, itemsep=1pt}
+\setlist[enumerate]{leftmargin=*, topsep=3pt, itemsep=1pt}
+
+% ── Hyperlinks ────────────────────────────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = blue!70!black,
+  citecolor  = blue!70!black,
+  urlcolor   = blue!70!black,
+}
+
+% ── Bibliography ──────────────────────────────────────────────────────────────
+\usepackage{natbib}
+\bibliographystyle{abbrvnat}
+
+% ── Header / footer (KOMA built-in) ──────────────────────────────────────────
+\usepackage{scrlayer-scrpage}
+\pagestyle{scrheadings}
+\clearpairofpagestyles
+\ohead{\normalfont\small CS 6120 · Natural Language Processing · Northeastern University}
+\ihead{\normalfont\small Shourya Srivastava}
+\ofoot{\pagemark}
+
+% ── Captions ─────────────────────────────────────────────────────────────────
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf}
+
+% ── Section spacing ───────────────────────────────────────────────────────────
+\RedeclareSectionCommand[beforeskip=1.2ex plus .2ex, afterskip=0.6ex plus .1ex]{section}
+\RedeclareSectionCommand[beforeskip=0.8ex plus .1ex, afterskip=0.4ex plus .1ex]{subsection}
 
 % ── Title block ───────────────────────────────────────────────────────────────
 \title{ArXiv Research Assistant:\\
        A Fully Local Retrieval-Augmented Generation System\\
        for Scientific Literature}
-\subtitle{CS 6120 – Natural Language Processing \\ Final Project Report}
+\subtitle{CS 6120 -- Natural Language Processing \\ Final Project Report}
 \author{Shourya Srivastava \quad \texttt{srivastava.shou@northeastern.edu}}
 \date{Spring 2026}
 
@@ -38,12 +94,12 @@ retraining.
   \item \textit{What are we trying to do?} Build a locally-runnable question
         answering assistant over the ArXiv scientific preprint corpus that cites
         its sources and never fabricates references.
-  \item \textit{How is it done today, and what are the limits of current
-        practice?} General LLMs hallucinate citations; search engines return
-        links but cannot synthesise answers; existing scholarly tools
-        (Semantic Scholar, Elicit) require cloud APIs.
+  \item \textit{How is it done today, and what are the limits?} General LLMs
+        hallucinate citations; search engines return links but cannot synthesise
+        answers; existing scholarly tools (Semantic Scholar, Elicit) require
+        cloud APIs.
   \item \textit{What is new in our approach?} A fully local, containerised
-        stack—no API keys, reproducible on any machine with 8\,GB RAM—combining
+        stack---no API keys, reproducible on any machine with 8\,GB RAM---combining
         dense vector retrieval with a compact open-weight LLM.
   \item \textit{If successful, what difference does it make?} Researchers can
         interactively query tens of thousands of papers with grounded,
@@ -54,46 +110,43 @@ retraining.
 \section{Background and Motivation}
 
 \subsection{Retrieval-Augmented Generation}
-
 \citet{rag2020} introduced RAG for knowledge-intensive NLP tasks by coupling a
-dense retriever (DPR~\citep{dpr2020}) with a seq2seq generator.
+dense retriever with a seq2seq generator.
 \citet{realm2020} extended retrieval to the pre-training stage, while
-\citet{atlas2022} showed that a smaller (11B) RAG model can match GPT-3 (175B)
-on knowledge benchmarks when retrieval quality is high.
+\citet{atlas2022} showed that a smaller RAG model can match GPT-3 on knowledge
+benchmarks when retrieval quality is high.
 Our system follows the \textit{modular RAG} design of~\citet{modularrag2023},
 separating the retriever, context builder, and generator so each component can
-be replaced independently.
+be swapped independently.
 
 \subsection{Dense Retrieval}
-
 Sparse methods such as BM25~\citep{bm25} match on token overlap and miss
 semantic synonyms.
 Bi-encoder dense retrievers~\citep{dpr2020} represent queries and documents as
-vectors in a shared embedding space and retrieve by maximum inner product search.
+vectors in a shared embedding space and retrieve by maximum inner product
+search.
 We use \textit{all-MiniLM-L6-v2}~\citep{reimers2019sentencebert}, a
 sentence-transformer distilled to 22M parameters that provides an excellent
 speed--quality trade-off, producing 384-dimensional unit-norm vectors in under
 25\,ms per query.
 
 \subsection{Local LLM Inference}
-
-The emergence of efficient open-weight models—LLaMA~\citep{llama2023},
-Mistral~\citep{mistral2023}, and Llama 3~\citep{llama3}—has made high-quality
+The emergence of efficient open-weight models---LLaMA~\citep{llama2023},
+Mistral~\citep{mistral2023}, and Llama~3~\citep{llama3}---has made high-quality
 local inference practical.
-Ollama~\citep{ollama2024} wraps these models in a unified REST API with
-4-bit quantisation (Q4\_K\_M), reducing the memory footprint of Llama~3.2~3B
-to approximately 2\,GB and making CPU-only deployment viable.
+Ollama~\citep{ollama2024} wraps these models in a unified REST API with 4-bit
+quantisation (Q4\_K\_M), reducing the memory footprint of Llama~3.2~3B to
+approximately 2\,GB and making CPU-only deployment viable.
 
 \subsection{Data}
-
 The Cornell-University/arxiv dataset~\citep{clement2019arxiv} on HuggingFace
-contains over 1.7 million papers spanning 1991–2025.
-We index the 50{,}000 most recent papers in eight CS/ML categories
+contains over 1.7 million papers spanning 1991--2025.
+We index the 50{,}000 most recent papers across eight CS/ML categories
 (\texttt{cs.AI}, \texttt{cs.LG}, \texttt{cs.CL}, \texttt{cs.CV},
 \texttt{cs.IR}, \texttt{stat.ML}, \texttt{cs.NE}, \texttt{cs.RO}),
 prioritising recent work that is absent from pre-trained LLM knowledge.
-Each record contributes its title and abstract (average 175 words,
-well within the 512-token encoder limit) as a single indexable document.
+Each record contributes its title and abstract (average 175 words, well within
+the 512-token encoder limit) as a single indexable document.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Proposed Approach / Implementation Details}
@@ -108,13 +161,14 @@ request (Figure~\ref{fig:arch}).
 \centering
 \begin{tikzpicture}[
   box/.style  = {rectangle, rounded corners=4pt, draw=black!50, fill=#1,
-                 text centered, minimum height=0.85cm, minimum width=2.7cm, font=\small},
+                 text centered, minimum height=0.85cm, minimum width=2.7cm,
+                 font=\small},
   arr/.style  = {-{Latex[length=2mm]}, thick, color=black!65},
   darr/.style = {-{Latex[length=2mm]}, thick, dashed, color=gray!60},
   lbl/.style  = {font=\footnotesize\itshape, color=gray!75},
   node distance = 1.0cm and 1.4cm,
 ]
-%% Ingestion (left column)
+% Ingestion (left column)
 \node[box=blue!10]   (hf)     {HuggingFace\\ArXiv Dataset};
 \node[box=blue!10,  below=of hf]  (api)    {ArXiv API\\(fallback)};
 \node[box=orange!20,below=of api] (emb)    {all-MiniLM-L6-v2\\Embedder};
@@ -124,9 +178,10 @@ request (Figure~\ref{fig:arch}).
 \draw[arr]  (emb) -- (chroma) node[midway,right,lbl]{upsert};
 \draw[decorate, decoration={brace,amplitude=5pt}, thick, color=blue!50]
   ([xshift=-1.5cm]hf.north west) -- ([xshift=-1.5cm]chroma.south west)
-  node[midway,xshift=-0.9cm,rotate=90,anchor=south,font=\small\bfseries,color=blue!65]{Ingestion};
+  node[midway,xshift=-0.9cm,rotate=90,anchor=south,
+       font=\small\bfseries,color=blue!65]{Ingestion};
 
-%% Query (right column)
+% Query (right column)
 \node[box=purple!15, right=4.2cm of hf] (user)   {User Query\\(Streamlit)};
 \node[box=orange!20, below=of user]     (qemb)   {Embed Query};
 \node[box=green!15,  below=of qemb]     (search) {Top-$k$ Retrieval};
@@ -139,69 +194,60 @@ request (Figure~\ref{fig:arch}).
 \draw[arr] (chroma.east) to[out=0,in=180] (search.west);
 \draw[decorate, decoration={brace,amplitude=5pt,mirror}, thick, color=purple!50]
   ([xshift=1.5cm]user.north east) -- ([xshift=1.5cm]out.south east)
-  node[midway,xshift=0.9cm,rotate=-90,anchor=south,font=\small\bfseries,color=purple!65]{Query};
+  node[midway,xshift=0.9cm,rotate=-90,anchor=south,
+       font=\small\bfseries,color=purple!65]{Query};
 \end{tikzpicture}
-\caption{ArXiv Research Assistant architecture.
-  The ingestion pipeline (left) indexes papers once; the query pipeline (right)
-  embeds each user question, retrieves the top-$k$ papers, and streams a
-  grounded answer from the local LLM.}
+\caption{ArXiv Research Assistant architecture. The ingestion pipeline (left)
+  indexes papers once; the query pipeline (right) embeds each user question,
+  retrieves the top-$k$ papers, and streams a grounded answer from the local LLM.}
 \label{fig:arch}
 \end{figure}
 
 \subsection{Ingestion Pipeline}
-
-Papers are downloaded in a streaming fashion from the HuggingFace
-\texttt{Cornell-University/arxiv} dataset (with automatic fallback to the
-official ArXiv export API).
-Each batch of 512 papers is embedded with \textit{all-MiniLM-L6-v2}
-(384-d, cosine-normalised) and immediately upserted into ChromaDB~\citep{chromadb2023},
-so the index is queryable from the very first batch rather than after full
-ingestion completes.
-The pipeline supports \textbf{incremental resume}: on restart it fetches
-existing document IDs and skips already-indexed papers.
+Papers are streamed from the HuggingFace \texttt{Cornell-University/arxiv}
+dataset (with automatic fallback to the official ArXiv export API).
+Each batch of 512 papers is embedded with \textit{all-MiniLM-L6-v2} and
+immediately upserted into ChromaDB~\citep{chromadb2023}, so the index is
+queryable from the very first batch.
+The pipeline supports \textbf{incremental resume}: on restart it skips
+already-indexed document IDs.
 The ChromaDB collection uses a cosine HNSW index for sub-millisecond
 approximate nearest-neighbour search at 50k-document scale.
 
 \paragraph{Preprocessing.}
 Each document is the concatenation of the paper's title and abstract (mean
-175 words, $\sigma\approx 45$), matching the 512-token context of the
-embedding model.
+175 words, $\sigma \approx 45$), fitting within the 512-token encoder limit.
 No additional chunking is required at the abstract level.
-Author strings are truncated to 500 characters to avoid ChromaDB metadata
-size limits.
 
 \subsection{Query Pipeline}
-
 \begin{enumerate}
-  \item \textbf{Query embedding.} The user question is encoded by the same
-        \textit{all-MiniLM-L6-v2} encoder (unit-norm, 384-d, $<$25\,ms).
+  \item \textbf{Query embedding.} The user question is encoded by
+        \textit{all-MiniLM-L6-v2} (unit-norm, 384-d, $<$25\,ms).
   \item \textbf{Dense retrieval.} ChromaDB returns the top-$k$ papers by
-        cosine similarity ($k=5$ by default; adjustable via UI slider).
-        An optional category filter (e.g., \texttt{cs.CV}) can be applied
-        via a ChromaDB \texttt{\$contains} metadata predicate.
-  \item \textbf{Prompt construction.} A structured prompt is built containing:
-        (a) a strict system instruction, (b) numbered abstract blocks with
-        title/authors/date/URL, and (c) the user question.
+        cosine similarity ($k = 5$ by default; adjustable via UI slider).
+        An optional category filter (e.g.\ \texttt{cs.CV}) can be applied
+        via a metadata predicate.
+  \item \textbf{Prompt construction.} A structured prompt is built with a
+        strict system instruction, numbered abstract blocks with
+        title/authors/date/URL, and the user question.
   \item \textbf{Streaming generation.} The prompt is sent to Ollama's REST
-        endpoint (\texttt{/api/generate}, \texttt{stream: true}).
-        Tokens are yielded one-by-one and displayed live in Streamlit.
-  \item \textbf{Citation cards.} Each retrieved paper is displayed as a card
-        with title, relevance score ($1-d_\text{cosine}$), categories, date,
-        and a clickable \texttt{arxiv.org/abs/<id>} link.
+        endpoint with \texttt{stream: true}; tokens are displayed live in
+        Streamlit.
+  \item \textbf{Citation cards.} Each retrieved paper is shown with its title,
+        relevance score, categories, date, and a clickable
+        \texttt{arxiv.org/abs/<id>} link.
 \end{enumerate}
 
 \subsection{Hallucination Mitigation}
-
 The system prompt explicitly constrains the model:
 \begin{quote}\small
 \textit{``Answer using ONLY the information provided in the retrieved abstracts.
 If the context does not contain enough information, say so explicitly.
 Do NOT speculate beyond the provided context.''}
 \end{quote}
-Generation temperature is set to 0.1 (top-$p$ = 0.9) to minimise creative
-deviation.
-Across our 30-query evaluation, the system produced \textbf{zero hallucinated
-citations}; every bracketed reference corresponded to a real, retrievable paper.
+Generation uses temperature 0.1 and top-$p$ = 0.9 to minimise deviation from
+source material. Across our 30-query evaluation the system produced
+\textbf{zero hallucinated citations}.
 
 \subsection{Evaluation}
 
@@ -213,46 +259,42 @@ citations}; every bracketed reference corresponded to a real, retrievable paper.
 \toprule
 \textbf{Method} & \textbf{P@1} & \textbf{P@3} & \textbf{P@5} & \textbf{MRR} \\
 \midrule
-BM25 (baseline) & 0.53 & 0.61 & 0.67 & 0.58 \\
-all-MiniLM-L6-v2 (ours) & \textbf{0.77} & \textbf{0.79} & \textbf{0.81} & \textbf{0.79} \\
+BM25 (baseline)          & 0.53 & 0.61 & 0.67 & 0.58 \\
+all-MiniLM-L6-v2 (ours)  & \textbf{0.77} & \textbf{0.79} & \textbf{0.81} & \textbf{0.79} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Dense retrieval outperforms BM25 by +24\,pp at P@1, confirming that semantic
-similarity better captures research intent than keyword overlap.
-Retrieval latency is under 30\,ms; end-to-end latency on a CPU-only GCP
-\texttt{n2-standard-4} instance is $\approx$51\,s (embedding: 22\,ms,
-retrieval: 8\,ms, LLM generation: $\approx$51\,s for 200 tokens).
+Dense retrieval outperforms BM25 by +24\,pp at P@1.
+End-to-end latency on a CPU-only GCP \texttt{n2-standard-4} instance is
+$\approx$51\,s (embedding: 22\,ms, retrieval: 8\,ms, LLM generation:
+$\approx$51\,s for 200 tokens).
 
 \subsection{Deployment}
-
 The full stack is containerised with Docker Compose into two services:
 \texttt{ollama} (port 11434) and \texttt{app} (Python 3.11-slim, port 8501).
 Docker volumes persist ChromaDB and Ollama model weights across restarts.
-A startup script (a) waits for Ollama readiness, (b) pulls the model, (c)
-runs a single-token warmup request to load weights into RAM, and (d) launches
-ingestion in the background so Streamlit is immediately available.
-The system is deployed on a GCP \texttt{n2-standard-4} VM at
-\texttt{http://34.26.47.93:8501}.
+A startup script pre-warms the LLM with a single-token dummy request so
+weights are in RAM before the first user query.
+The system is deployed on GCP at \texttt{http://34.26.47.93:8501}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Submission Guidelines}
 
 \begin{itemize}
   \item \textbf{Repository (public):}
-        \url{https://github.com/shouryasrivastava/arxiv-rag}
-        — contains \texttt{src/}, \texttt{scripts/}, \texttt{Dockerfile},
-        \texttt{docker-compose.yml}, \texttt{requirements.txt}, and
-        this write-up under \texttt{writeup/}.
+        \url{https://github.com/shouryasrivastava/arxiv-rag} ---
+        contains \texttt{src/}, \texttt{scripts/}, \texttt{Dockerfile},
+        \texttt{docker-compose.yml}, \texttt{requirements.txt}, and this
+        write-up under \texttt{writeup/}.
   \item \textbf{Live demo endpoint:}
-        \texttt{http://34.26.47.93:8501} — publicly accessible Streamlit UI
-        backed by a GCP \texttt{n2-standard-4} VM running the full Docker stack.
+        \texttt{http://34.26.47.93:8501} --- publicly accessible Streamlit UI
+        running on a GCP \texttt{n2-standard-4} VM.
   \item \textbf{One-command local setup:}
-        \texttt{docker compose up -{-}build} \; (requires Docker Desktop and
+        \texttt{docker compose up -{-}build} (requires Docker Desktop and
         $\geq$8\,GB free RAM; model download $\approx$2\,GB on first run).
   \item \textbf{Author:}
-        Shourya Srivastava — system architecture, ingestion pipeline, RAG
+        Shourya Srivastava --- system architecture, ingestion pipeline, RAG
         pipeline, Streamlit frontend, Docker deployment, GCP setup, evaluation.
 \end{itemize}
 
