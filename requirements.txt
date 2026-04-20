@@ -1,0 +1,25 @@
+# ── Web framework ─────────────────────────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── Vector database ───────────────────────────────────────────────────────────
+chromadb>=0.5.3
+
+# ── Embeddings (CPU-friendly) ─────────────────────────────────────────────────
+sentence-transformers>=3.0.0
+
+# ── Dataset download ──────────────────────────────────────────────────────────
+datasets>=2.20.0
+huggingface_hub>=0.23.0
+
+# ── HTTP client (Ollama API calls) ────────────────────────────────────────────
+requests>=2.31.0
+
+# ── Core numerics / utilities ─────────────────────────────────────────────────
+numpy>=1.26.0
+tqdm>=4.66.0
+
+# ── Deep learning backend for sentence-transformers ───────────────────────────
+# CPU-only torch keeps the Docker image small (~900 MB vs ~3 GB for CUDA).
+# For GPU inference on the Ollama container use the GPU image instead.
+torch>=2.1.0
+transformers>=4.40.0

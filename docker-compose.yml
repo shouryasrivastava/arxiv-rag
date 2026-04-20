@@ -1,0 +1,75 @@
+##############################################################################
+# ArXiv Research Assistant — Docker Compose
+#
+# Services:
+#   ollama  — local LLM inference server (CPU by default; GPU section below)
+#   app     — Streamlit UI + RAG pipeline + ChromaDB
+#
+# Quickstart:
+#   docker compose up --build
+#
+# Then open http://localhost:8501 in your browser.
+##############################################################################
+
+services:
+
+  # ── Ollama LLM server ────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: arxiv_rag_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || wget -qO- http://localhost:11434/api/tags > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+    # ── GPU support (NVIDIA) ──────────────────────────────────────────────
+    # Uncomment the block below if your GCP instance has a GPU
+    # and the NVIDIA Container Toolkit is installed.
+    #
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── Application (Streamlit + ChromaDB + RAG) ─────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arxiv_rag_app
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist the ChromaDB vector store across restarts
+      - chroma_data:/app/data/chroma
+      # Cache HuggingFace model downloads
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      # ── RAG settings ────────────────────────────────────────────────────
+      CHROMA_PATH:    /app/data/chroma
+      EMBED_MODEL:    all-MiniLM-L6-v2
+      OLLAMA_HOST:    http://ollama:11434
+      OLLAMA_MODEL:   llama3.2:3b        # change to mistral:7b for higher quality
+      INGEST_LIMIT:   "50000"            # number of ArXiv papers to index
+      # ── Optional: HuggingFace auth token (only needed for gated datasets) ─
+      # HUGGING_FACE_HUB_TOKEN: your_token_here
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
+  hf_cache:
